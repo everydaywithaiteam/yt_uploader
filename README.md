@@ -26,9 +26,15 @@ Other forms:
 ./upload 12 --title 2 --thumbnail 3          # alternate title #2, third thumbnail
 ./upload 12 --no-captions
 ./upload 12 --planned-chapters               # keep the metadata's chapter times as written
+./upload 12 --normalize-only                 # just normalize the audio
+./upload 12 --skip-normalize                 # upload the export as-is
+./upload --check-auth                        # test the Google sign-in
 ```
 
-What it does: validates the metadata (title/description limits, chapter rules **against the
+What it does: normalizes the export's audio to -14 LUFS with
+[`yt_audio_norm`](../audio_normalization) (path in `config.json` → `audio_normalizer`; skipped
+when a fresh `-normalized_audio` file already exists; stops before uploading if it writes a
+`⚠️ CHECK THIS` file), validates the metadata (title/description limits, chapter rules **against the
 real video length**, tag length, leftover author notes like `[confirm …]`), uploads the video
 resumably, sets the thumbnail (re-encodes to JPEG if > 2 MB), uploads the `.srt`, adds to a
 playlist if one is named, then prints the Studio link and the steps the API can't do (pin a
@@ -36,6 +42,15 @@ comment, end screen/cards, thumbnail Test & Compare).
 
 Uploads are recorded in `state/uploads.json`, so the same folder won't be uploaded twice
 (override with `--force`). Default visibility is **private** (`config.json`).
+
+## Claude skill
+
+`skills/ewai-publish-video/SKILL.md` wraps this as `/ewai-publish-video`. It's symlinked into
+`~/.claude/skills/`, so edits here are live:
+
+```bash
+ln -s "$PWD/skills/ewai-publish-video" ~/.claude/skills/ewai-publish-video
+```
 
 ## Mapping from upload_metadata_vN.md
 
