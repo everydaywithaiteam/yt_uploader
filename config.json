@@ -1,0 +1,12 @@
+{
+  "videos_root": "~/Desktop/Everyday With AI/videos",
+  "channel_id": "UCZPRXIc9hQKbxq8fiL9TQgw",
+  "timezone": "America/Los_Angeles",
+  "default_privacy": "private",
+  "notify_subscribers": true,
+  "upload_captions": true,
+  "contains_synthetic_media": false,
+  "language": "en",
+  "default_playlist": null,
+  "playlist_overrides": {}
+}

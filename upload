@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Wrapper: creates the venv on first run, then runs the uploader.
+set -euo pipefail
+cd "$(dirname "$0")"
+if [ ! -x .venv/bin/python ]; then
+  python3 -m venv .venv
+  .venv/bin/pip install -q --upgrade pip
+  .venv/bin/pip install -q -r requirements.txt
+fi
+# Silence Python 3.9 end-of-life notices from the Google libraries.
+export PYTHONWARNINGS=ignore
+exec .venv/bin/python yt_upload.py "$@"
