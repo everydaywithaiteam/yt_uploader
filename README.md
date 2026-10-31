@@ -73,10 +73,12 @@ YouTube uploads need **OAuth** (signing in as the channel), not an API key.
 
 1. Go to <https://console.cloud.google.com/>, create a project (e.g. `yt-uploader`).
 2. **APIs & Services → Library** → enable **YouTube Data API v3**.
-3. **Google Auth Platform → Branding / Audience**: user type **External**, fill in app name and
-   your email. Under **Audience**, click **Publish app** (status *In production*). Skip
-   verification — it's only you. *If you leave it in "Testing", your login expires every 7 days.*
-4. **Data Access → Add scopes**: `.../auth/youtube.upload` and `.../auth/youtube.force-ssl`.
+3. **Google Auth Platform → Get started**: app name, support email, user type **External**.
+   Then **Audience → Test users → Add users** and add the Google account that owns the
+   channel. (Publishing the app instead needs a home page + privacy policy on a domain you
+   own; in Testing mode the login expires every 7 days and the script just reopens the
+   browser to sign in again.)
+4. *(Optional)* **Data Access → Add scopes**: `youtube.upload` and `youtube.force-ssl`.
 5. **Clients → Create client → Desktop app**. Download the JSON and save it as
    `credentials/client_secret.json` in this repo (git-ignored).
 6. Run `./upload` once (not dry-run). A browser opens: sign in, choose the

@@ -206,6 +206,7 @@ def main():
     ap.add_argument("--no-captions", action="store_true", help="skip uploading the .srt")
     ap.add_argument("--yes", "-y", action="store_true", help="skip the confirmation prompt")
     ap.add_argument("--force", action="store_true", help="upload despite errors or a previous upload")
+    ap.add_argument("--check-auth", action="store_true", help="sign in, show the channel, upload nothing")
     ap.add_argument("--short", action="store_true", help="Shorts mode (not implemented yet)")
     args = ap.parse_args()
 
@@ -213,6 +214,10 @@ def main():
         sys.exit("Shorts upload is TBD: define the shorts folder/metadata layout first.")
 
     config = load_json(CONFIG_PATH, {})
+    if args.check_auth:
+        from ytu import youtube as yt_api
+        yt_api.get_service(CREDS_DIR, config.get("channel_id"))
+        return
     state = load_json(STATE_PATH, {})
     root = os.path.expanduser(config["videos_root"])
 
