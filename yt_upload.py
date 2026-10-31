@@ -203,6 +203,7 @@ def main():
     ap.add_argument("--thumbnail", type=int, default=1, metavar="N", help="use Nth thumbnail (default 1)")
     ap.add_argument("--planned-chapters", action="store_true",
                     help="use the metadata's chapter times as-is instead of aligning them to the .srt")
+    ap.add_argument("--playlist", metavar="NAME", help="add to this playlist instead of the config default")
     ap.add_argument("--no-captions", action="store_true", help="skip uploading the .srt")
     ap.add_argument("--yes", "-y", action="store_true", help="skip the confirmation prompt")
     ap.add_argument("--force", action="store_true", help="upload despite errors or a previous upload")
@@ -251,9 +252,15 @@ def main():
     publish_at = parse_publish_at(args.publish_at, config.get("timezone", "UTC")) if args.publish_at else None
     if publish_at:
         privacy = "private"
-    playlist_name = config.get("playlist_overrides", {}).get(os.path.basename(folder)) \
-        or (meta.playlist if meta.playlist and not md.find_placeholders(meta.playlist) else None) \
-        or config.get("default_playlist")
+    # --playlist > per-folder override > config default > metadata's "Playlist" setting.
+    meta_playlist = meta.playlist if meta.playlist and not md.find_placeholders(meta.playlist) else None
+    playlist_name = args.playlist \
+        or config.get("playlist_overrides", {}).get(os.path.basename(folder)) \
+        or config.get("default_playlist") \
+        or meta_playlist
+    if meta_playlist and playlist_name and meta_playlist.strip().lower() != playlist_name.strip().lower():
+        warnings.append(f"Metadata names playlist '{meta_playlist}', using '{playlist_name}' instead "
+                        "(pass --playlist to choose).")
 
     # ---- plan ----
     rel = lambda p: os.path.relpath(p, folder) if p else "—"

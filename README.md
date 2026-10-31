@@ -25,17 +25,22 @@ Other forms:
 ./upload 12 --privacy unlisted
 ./upload 12 --title 2 --thumbnail 3          # alternate title #2, third thumbnail
 ./upload 12 --no-captions
+./upload 12 --playlist "Other playlist"      # instead of the default "Road to 100"
 ./upload 12 --planned-chapters               # keep the metadata's chapter times as written
 ```
 
 What it does: validates the metadata (title/description limits, chapter rules **against the
 real video length**, tag length, leftover author notes like `[confirm …]`), uploads the video
-resumably, sets the thumbnail (re-encodes to JPEG if > 2 MB), uploads the `.srt`, adds to a
-playlist if one is named, then prints the Studio link and the steps the API can't do (pin a
+resumably, sets the thumbnail (re-encodes to JPEG if > 2 MB), uploads the `.srt`, adds to the
+playlist, then prints the Studio link and the steps the API can't do (pin a
 comment, end screen/cards, thumbnail Test & Compare).
 
 Uploads are recorded in `state/uploads.json`, so the same folder won't be uploaded twice
 (override with `--force`). Default visibility is **private** (`config.json`).
+
+Playlist: every upload goes to **Road to 100** (`default_playlist` in `config.json`). Order of
+precedence: `--playlist NAME` > `playlist_overrides` (folder name → playlist) > `default_playlist`
+> the metadata's `Playlist` setting. The playlist must already exist on the channel.
 
 ## Mapping from upload_metadata_vN.md
 
