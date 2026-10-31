@@ -6,6 +6,9 @@ Usage:
   ./upload 12                   # "video 12 - ..." folder
   ./upload "/path/to/video dir" # explicit folder
   ./upload 12 --dry-run         # show what would be uploaded, touch nothing
+
+Audio is normalized first (yt_audio_norm, path in config.json) unless a fresh
+-normalized_audio file already exists next to the export.
 """
 import argparse
 import datetime as dt
@@ -86,9 +89,13 @@ def validate(meta: md.UploadMetadata, pkg: pk.Package, duration: Optional[float]
 
     if not pkg.video_path:
         errors.append("No final video file (.mp4/.mov) found in the video folder.")
-    elif len(pkg.video_candidates) > 1:
-        others = [os.path.relpath(p, pkg.video_dir) for p in pkg.video_candidates if p != pkg.video_path]
-        warnings.append(f"Several video files found; using the FCP/newest one. Others: {others}")
+    else:
+        masters = [p for p in pkg.video_candidates if not pk.is_norm_output(p)]
+        if len(masters) > 1:
+            others = [os.path.relpath(p, pkg.video_dir) for p in masters if p != pkg.master_path]
+            warnings.append(f"Several video exports found; using the FCP/newest one. Others: {others}")
+        if not pkg.master_path:
+            warnings.append("Original export not found; uploading the newest normalized file as-is.")
 
     if not meta.title:
         errors.append("No title found under '## Recommended title'.")
@@ -175,6 +182,33 @@ def derive_chapters(meta: md.UploadMetadata, pkg: pk.Package):
     return aligned, source, warnings
 
 
+def normalize_audio(pkg: pk.Package, config: dict):
+    """Run yt_audio_norm on the master and point pkg.video_path at its output."""
+    script = os.path.expanduser(config.get("audio_normalizer") or "")
+    if not os.path.isfile(script):
+        sys.exit(f"Audio normalizer not found at '{script}' (config.json: audio_normalizer). "
+                 "Fix the path or pass --skip-normalize.")
+    master = pkg.master_path
+    print(f"\nNormalizing audio: {os.path.basename(master)}")
+    # Pass the file explicitly: the normalizer's default lookup only matches *final.mp4.
+    rc = subprocess.run(["/bin/bash", script, master], cwd=os.path.dirname(master),
+                        env={**os.environ, "YT_AUDIO_NORM_NO_NOTIFY": "1"}).returncode
+    if rc not in (0, 4, 5):  # 4 = already normalized, 5 = shipped slightly under target
+        sys.exit(f"Audio normalization failed (exit {rc}). Nothing uploaded.")
+    base = os.path.splitext(os.path.basename(master))[0]
+    check = os.path.join(os.path.dirname(master), f"⚠️ CHECK THIS — {base}.txt")
+    if os.path.exists(check):
+        with open(check, encoding="utf-8") as f:
+            print("\n" + f.read().strip())
+        sys.exit(f"\nThe normalizer flagged something to check ({os.path.basename(check)}). "
+                 "Nothing uploaded. Re-run after checking, with --skip-normalize to upload as-is.")
+    out = pk.normalized_for(master, pk.find_videos(pkg.video_dir))
+    if not out:
+        sys.exit("Normalizer finished but its -normalized_audio output wasn't found. Nothing uploaded.")
+    pkg.video_path, pkg.needs_normalize = out, False
+    print(f"Normalized file: {os.path.basename(out)}")
+
+
 def prepare_thumbnail(path: str) -> str:
     if os.path.getsize(path) <= THUMB_MAX_BYTES:
         return path
@@ -207,6 +241,9 @@ def main():
     ap.add_argument("--no-captions", action="store_true", help="skip uploading the .srt")
     ap.add_argument("--yes", "-y", action="store_true", help="skip the confirmation prompt")
     ap.add_argument("--force", action="store_true", help="upload despite errors or a previous upload")
+    ap.add_argument("--skip-normalize", action="store_true",
+                    help="upload the export as-is, without audio normalization")
+    ap.add_argument("--normalize-only", action="store_true", help="normalize the audio, then stop")
     ap.add_argument("--check-auth", action="store_true", help="sign in, show the channel, upload nothing")
     ap.add_argument("--short", action="store_true", help="Shorts mode (not implemented yet)")
     args = ap.parse_args()
@@ -268,6 +305,11 @@ def main():
     print(f"Package:     {os.path.basename(pkg.package_dir)}  ({os.path.basename(pkg.metadata_path)})")
     size = f"{os.path.getsize(pkg.video_path) / 1e6:.0f} MB" if pkg.video_path else ""
     print(f"Video:       {rel(pkg.video_path)}  {size}  {fmt_secs(duration) if duration else ''}")
+    if pkg.needs_normalize:
+        print("Audio:       " + ("NOT normalized (--skip-normalize)" if args.skip_normalize
+                                 else "will be normalized first (-14 LUFS), then that file is uploaded"))
+    elif pkg.video_path and pk.is_norm_output(pkg.video_path):
+        print("Audio:       already normalized")
     print(f"Thumbnail:   {rel(thumbnail)}")
     print(f"Captions:    {rel(pkg.captions_path) if use_captions else 'skipped'}")
     print(f"Title:       {meta.title}")
@@ -289,6 +331,12 @@ def main():
     for e in errors:
         print(f"ERROR:   {e}")
 
+    if args.normalize_only:
+        if args.dry_run or not pkg.needs_normalize:
+            print("\nNothing to normalize." if not pkg.needs_normalize else "\nDry run: nothing normalized.")
+            return
+        normalize_audio(pkg, config)
+        return
     if folder in state and not args.force:
         prev = state[folder]
         sys.exit(f"\nAlready uploaded as https://youtu.be/{prev['video_id']} on {prev['uploaded_at']}. "
@@ -302,7 +350,10 @@ def main():
         sys.exit("Cancelled.")
 
     from ytu import youtube as yt_api  # deferred so --dry-run works without credentials
-    yt = yt_api.get_service(CREDS_DIR, config.get("channel_id"))
+    yt = yt_api.get_service(CREDS_DIR, config.get("channel_id"))  # sign in before the long normalize step
+
+    if pkg.needs_normalize and not args.skip_normalize:
+        normalize_audio(pkg, config)
 
     lang = meta.language or config.get("language", "en")
     body = {

@@ -17,7 +17,9 @@ class Package:
     package_dir: str
     version: int
     metadata_path: str
-    video_path: Optional[str] = None
+    video_path: Optional[str] = None      # the file that gets uploaded
+    master_path: Optional[str] = None     # raw export, input to audio normalization
+    needs_normalize: bool = False
     video_candidates: List[str] = field(default_factory=list)
     captions_path: Optional[str] = None
     script_path: Optional[str] = None
@@ -54,15 +56,28 @@ def find_videos(video_dir: str) -> List[str]:
     return found
 
 
-def pick_video(candidates: List[str]) -> Optional[str]:
-    if not candidates:
+def is_norm_output(path: str) -> bool:
+    """Files written by yt_audio_norm: the normalized master or its intermediate."""
+    name = os.path.basename(path).lower()
+    return "-normalized_audio" in name or "-stage1" in name
+
+
+def pick_master(candidates: List[str]) -> Optional[str]:
+    """The final edit as exported: FCP export folder first, then newest."""
+    masters = [p for p in candidates if not is_norm_output(p)]
+    if not masters:
         return None
-    # Prefer the FCP export folder, then normalized-audio renders, then newest.
-    def score(p):
-        return ("fcp" in os.path.dirname(p).lower(),
-                "normalized_audio" in os.path.basename(p).lower(),
-                os.path.getmtime(p))
-    return max(candidates, key=score)
+    return max(masters, key=lambda p: ("fcp" in os.path.dirname(p).lower(), os.path.getmtime(p)))
+
+
+def normalized_for(master: str, candidates: List[str]) -> Optional[str]:
+    """Newest normalized output of this master that is not older than it."""
+    base = os.path.splitext(os.path.basename(master))[0] + "-normalized_audio"
+    outs = [p for p in candidates
+            if os.path.dirname(p) == os.path.dirname(master)
+            and os.path.basename(p).startswith(base)
+            and os.path.getmtime(p) >= os.path.getmtime(master)]
+    return max(outs, key=os.path.getmtime) if outs else None
 
 
 def load(video_dir: str) -> Package:
@@ -77,7 +92,15 @@ def load(video_dir: str) -> Package:
 
     pkg = Package(video_dir=video_dir, package_dir=package_dir, version=version, metadata_path=meta[0])
     pkg.video_candidates = find_videos(video_dir)
-    pkg.video_path = pick_video(pkg.video_candidates)
+    pkg.master_path = pick_master(pkg.video_candidates)
+    if pkg.master_path:
+        pkg.video_path = normalized_for(pkg.master_path, pkg.video_candidates)
+        pkg.needs_normalize = pkg.video_path is None
+        pkg.video_path = pkg.video_path or pkg.master_path
+    else:
+        # Only normalized files present (master deleted or moved): upload the newest.
+        normalized = [p for p in pkg.video_candidates if "-normalized_audio" in os.path.basename(p).lower()]
+        pkg.video_path = max(normalized, key=os.path.getmtime) if normalized else None
 
     if pkg.video_path:
         srts = glob.glob(os.path.join(os.path.dirname(pkg.video_path), "*.srt"))

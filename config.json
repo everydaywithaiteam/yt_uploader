@@ -8,5 +8,6 @@
   "contains_synthetic_media": false,
   "language": "en",
   "default_playlist": "Road to 100",
-  "playlist_overrides": {}
+  "playlist_overrides": {},
+  "audio_normalizer": "~/Claude/audio_normalization/yt_audio_norm.sh"
 }
