@@ -8,7 +8,7 @@ from typing import List, Optional
 VIDEO_EXTS = (".mp4", ".mov", ".m4v")
 # Folders that hold b-roll / raw recordings, never the final edit.
 SKIP_DIRS = ("yt_video_vizualizations", "yt_video_visualizations", "screen_studio_recording",
-             "yt_shorts", "yt_production_package", "production-package")
+             "yt_screen_recordings", "yt_shorts", "yt_production_package", "production-package")
 
 
 @dataclass
@@ -22,6 +22,7 @@ class Package:
     needs_normalize: bool = False
     video_candidates: List[str] = field(default_factory=list)
     captions_path: Optional[str] = None
+    chapters_path: Optional[str] = None   # chapters.md beside the export, written by the edit
     script_path: Optional[str] = None
     prompter_path: Optional[str] = None
     thumbnails: List[str] = field(default_factory=list)
@@ -106,6 +107,8 @@ def load(video_dir: str) -> Package:
         srts = glob.glob(os.path.join(os.path.dirname(pkg.video_path), "*.srt"))
         if srts:
             pkg.captions_path = max(srts, key=os.path.getmtime)
+        chapters = os.path.join(os.path.dirname(pkg.video_path), "chapters.md")
+        pkg.chapters_path = chapters if os.path.isfile(chapters) else None
 
     script = latest_versioned(package_dir, "production_script")
     pkg.script_path = script[0] if script else None
