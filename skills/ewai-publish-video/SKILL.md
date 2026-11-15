@@ -1,6 +1,6 @@
 ---
 name: ewai-publish-video
-description: Publish a finished Everyday With AI long-form video to YouTube. Normalizes the final export's audio to -14 LUFS with yt_audio_norm, then uploads it with title, description, chapters re-timed from the .srt, tags, thumbnail and captions from the video's yt_production_package_vN. Use when the user wants to publish, post, or upload a video (e.g. "publish video 13", "upload the latest video", "post the new long one to YouTube"). Shorts are not supported yet.
+description: Publish a finished Everyday With AI long-form video to YouTube. Normalizes the final export's audio to -14 LUFS with yt_audio_norm, then uploads it with title, description, chapters re-timed from the .srt, tags, thumbnail and captions from the video's yt_production_package_vN. Use when the user wants to publish, post, or upload a video (e.g. "publish video 13", "upload the latest video", "post the new long one to YouTube"). Also uploads a batch of YouTube Shorts from a video's yt_shorts/ folder (or a one-off Short), in order, as private, optionally linked to the long-form video (e.g. "upload the shorts for video 13").
 ---
 
 # ewai-publish-video
@@ -19,7 +19,8 @@ Repo docs: `/Users/sam/Claude/yt_uploader/README.md`. Normalizer docs:
   `yt_production_package_vN` and hasn't been uploaded yet.
 - **Visibility (optional):** the default is private. `--publish-at "YYYY-MM-DD HH:MM"` schedules
   it (America/Los_Angeles). `--privacy unlisted|public` is also available.
-- **Shorts:** not implemented. If asked, say so and stop.
+- **Shorts:** a different flow. Read `shorts.md` in this skill's folder and follow it in place
+  of the steps below.
 
 Don't ask for anything the script can find itself.
 
