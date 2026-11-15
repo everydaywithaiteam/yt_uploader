@@ -114,10 +114,44 @@ approved, uploads work but stay private.
 
 ### Quota
 
-Default quota is 10,000 units/day. One full upload here ≈ 1,600 (video) + 50 (thumbnail) +
-400 (captions) + ~50 (playlist) ≈ **2,100 units → about 4 long videos/day**. Daily Shorts will
-need a quota increase (requested through the same audit form).
+Uploads (`videos.insert`) have their own bucket: **100 uploads/day**, 1 per call. Everything else
+shares **10,000 units/day**: thumbnail 50, captions 400, playlist add 50, lookups 1. So one
+long-form video is 1 upload + ≈500 units, and a batch of 7 Shorts is 7 uploads + ≈360 units.
+Both reset at midnight Pacific. Source:
+<https://developers.google.com/youtube/v3/determine_quota_cost>.
 
 ## Shorts
 
-TBD — `--short` is reserved. Needs a decision on the shorts folder layout and metadata file.
+Uploads a batch of Shorts from a video's `yt_shorts/` folder, one after another, as private:
+
+```
+video NN - <slug>/yt_shorts/
+  youtube-shorts-package-vN.md     ← highest N wins
+  v13 1 - Short_….mp4              ← top-level .mp4/.mov only (originals/ ignored)
+  v13 2 - Short_….mp4
+```
+
+```bash
+./upload 13 --shorts --dry-run                  # plan: order, titles, tags, descriptions
+./upload 13 --shorts                            # asks for the long-form link, then y/N
+./upload 13 --shorts --long-url sXwF7qQpIOY     # link (URL or ID) without the prompt
+./upload 13 --shorts --no-link                  # no long-form link
+./upload "/path/to/one-off/yt_shorts" --shorts  # a one-off Short outside a video folder
+./upload 13 --shorts --only 2,5                 # just Shorts 2 and 5
+```
+
+- **Metadata:** each `## Short N` section's `### Title`, `### Description` (or
+  `### Short description`) and `### Tags`. Script and on-screen sections are ignored.
+- **Order and pairing:** files are uploaded in file-name order (natural sort, so 10 comes after 9).
+  The leading number in the name (`v13 3 - …`, `3 Short_…`) picks the `## Short N` entry. Names
+  without numbers are paired by position, and then the counts must match.
+- **Long-form link:** defaults to the long-form upload of the same video folder recorded in
+  `state/uploads.json`. With a link, each description ends with `Watch the full video: <link>`,
+  and the report reminds you to set the Short's **Related video** in Studio (not in the API).
+- **Audio:** uploaded as-is. Shorts are normalized before the Gling edit.
+- **Playlist:** `shorts_playlist` in `config.json` (Road to 100); `--playlist NAME` / `--no-playlist`.
+- **State:** each Short is recorded in `state/shorts_uploads.json` right after it uploads. A
+  re-run skips those (`--force` to upload again). Long-form state isn't touched.
+- **Quota:** each Short is 1 of the 100 daily uploads plus 50 units for the playlist (see
+  Quota above). If a limit is hit mid-batch, the script stops cleanly and lists what's left. Re-run the same
+  command the next day.
