@@ -82,4 +82,5 @@ Don't ask for anything the script can find itself.
   the API audit (https://support.google.com/youtube/contact/yt_api_form). If Studio won't let
   the user make the video public, that's the cause.
 - The API can't pin comments, add end screens or cards, or start a thumbnail Test & Compare.
-- The default quota of 10,000 units a day allows about 4 full uploads.
+- Quota: 100 uploads a day (own bucket), plus 10,000 units a day for everything else
+  (≈500 per long-form video). Resets at midnight Pacific.

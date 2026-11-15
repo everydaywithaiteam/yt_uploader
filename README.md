@@ -114,9 +114,11 @@ approved, uploads work but stay private.
 
 ### Quota
 
-Default quota is 10,000 units/day. One full upload here ≈ 1,600 (video) + 50 (thumbnail) +
-400 (captions) + ~50 (playlist) ≈ **2,100 units → about 4 long videos/day**. Daily Shorts will
-need a quota increase (requested through the same audit form).
+Uploads (`videos.insert`) have their own bucket: **100 uploads/day**, 1 per call. Everything else
+shares **10,000 units/day**: thumbnail 50, captions 400, playlist add 50, lookups 1. So one
+long-form video is 1 upload + ≈500 units, and a batch of 7 Shorts is 7 uploads + ≈360 units.
+Both reset at midnight Pacific. Source:
+<https://developers.google.com/youtube/v3/determine_quota_cost>.
 
 ## Shorts
 
@@ -150,6 +152,6 @@ video NN - <slug>/yt_shorts/
 - **Playlist:** `shorts_playlist` in `config.json` (Road to 100); `--playlist NAME` / `--no-playlist`.
 - **State:** each Short is recorded in `state/shorts_uploads.json` right after it uploads. A
   re-run skips those (`--force` to upload again). Long-form state isn't touched.
-- **Quota:** at ≈1,650 units per Short (video + playlist), the default 10,000/day fits about 6. If
-  the quota runs out mid-batch, the script stops cleanly and lists what's left. Re-run the same
+- **Quota:** each Short is 1 of the 100 daily uploads plus 50 units for the playlist (see
+  Quota above). If a limit is hit mid-batch, the script stops cleanly and lists what's left. Re-run the same
   command the next day.
