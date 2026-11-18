@@ -144,7 +144,67 @@ def align(sections: List[Section], captions: List[Tuple[str, float]],
             result.append(AlignedChapter(title, plan_ts, None, coverage, "not found in recording, dropped"))
             continue
         result.append(AlignedChapter(title, plan_ts, captions[mapping[idxs[0]]][1], coverage))
+    return _finalize(result)
 
+
+# ---- chapters.md: section starts handed over by the edit (ewai-edit-video) ----
+#
+# | Title | Anchor | Edit time |
+# | --- | --- | --- |
+# | The finished result | This video is already here in the YouTube Studio | 00:00 |
+#
+# Anchor = the first words actually spoken where the chapter starts in the final edit.
+# Times are re-derived from the .srt, so later trims don't make the file stale.
+
+ANCHOR_MIN_RATIO = 0.6   # fuzzy match needed to accept an anchor (transcription slips)
+
+
+def anchors_from_file(path: str) -> List[Tuple[str, List[str], Optional[str]]]:
+    """Return (title, anchor words, edit time) rows from a chapters.md table."""
+    rows = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if not line.lstrip().startswith("|") or len(cells) < 2:
+                continue
+            if cells[0].lower() == "title" or set(cells[0]) <= set("-: "):
+                continue
+            words = tokenize(cells[1])
+            if cells[0] and words:
+                rows.append((cells[0], words, cells[2] if len(cells) > 2 and cells[2] else None))
+    return rows
+
+
+def _find_anchor(anchor: List[str], spoken: List[str], start: int) -> Tuple[Optional[int], float]:
+    """Earliest caption index >= start where the anchor matches well, else the best one."""
+    n = len(anchor)
+    ratio = lambda j: difflib.SequenceMatcher(None, anchor, spoken[j:j + n], autojunk=False).ratio()
+    best_j, best_r = None, 0.0
+    for j in range(start, len(spoken)):
+        r = ratio(j)
+        if r >= 0.85:
+            # A window a word early or late can also pass; take the best one in this cluster.
+            k = max(range(j, min(j + n, len(spoken))), key=ratio)
+            return k, ratio(k)
+        if r > best_r:
+            best_j, best_r = j, r
+    return (best_j, best_r) if best_r >= ANCHOR_MIN_RATIO else (None, best_r)
+
+
+def align_anchors(rows, captions: List[Tuple[str, float]]) -> List[AlignedChapter]:
+    spoken = [w for w, _ in captions]
+    result, pos = [], 0
+    for title, words, edit_time in rows:
+        j, ratio = _find_anchor(words, spoken, pos)
+        if j is None:
+            result.append(AlignedChapter(title, edit_time, None, ratio, "anchor not found in captions, dropped"))
+            continue
+        result.append(AlignedChapter(title, edit_time, captions[j][1], ratio))
+        pos = j + 1
+    return _finalize(result)
+
+
+def _finalize(result: List[AlignedChapter]) -> List[AlignedChapter]:
     # First kept chapter must sit at 0:00; enforce minimum chapter length.
     kept = [c for c in result if c.seconds is not None]
     if kept:

@@ -157,6 +157,25 @@ def derive_chapters(meta: md.UploadMetadata, pkg: pk.Package):
     if not pkg.captions_path:
         return None, None, ["No .srt found: keeping the planned chapters from the metadata."]
     warnings = []
+    if pkg.chapters_path:
+        # The edit knows where each section really starts (ad-libbed screen demos included).
+        source = os.path.basename(pkg.chapters_path) + " (from the edit)"
+        rows = chap.anchors_from_file(pkg.chapters_path)
+        if not rows:
+            return None, source, [f"{source} has no '| Title | Anchor |' rows: keeping the planned chapters."]
+        if os.path.getmtime(pkg.chapters_path) < os.path.getmtime(pkg.captions_path) - 3600:
+            warnings.append("chapters.md is more than an hour older than the .srt; check it belongs to this edit.")
+        aligned = chap.align_anchors(rows, chap.srt_words(pkg.captions_path))
+        derived = chap.to_chapters(aligned)
+        if not derived:
+            warnings.append("Fewer than 3 chapter anchors were found in the captions: no chapters will be set.")
+        for row in aligned:
+            if row.seconds is None and "dropped" in row.note:
+                warnings.append(f"Chapter '{row.title}': anchor not found in the .srt; fix its anchor in chapters.md.")
+            elif row.coverage < 0.85:
+                warnings.append(f"Chapter '{row.title}' anchor only matched {row.coverage:.0%}; check its start.")
+        meta.chapters = derived
+        return aligned, source, warnings
     if pkg.script_path:
         sections, source = chap.sections_from_script(pkg.script_path), os.path.basename(pkg.script_path)
     elif pkg.prompter_path:
@@ -321,7 +340,7 @@ def main():
     print(f"Tags ({len(meta.tags)}):   {', '.join(meta.tags)}")
     if aligned:
         print(f"\nChapters aligned from {os.path.basename(pkg.captions_path)} against {chapter_source}:")
-        print(f"  {'planned':>8}  {'actual':>7}  {'match':>5}  title")
+        print(f"  {'edit' if pkg.chapters_path else 'planned':>8}  {'actual':>7}  {'match':>5}  title")
         for row in aligned:
             actual = fmt_secs(row.seconds) if row.seconds is not None else "—"
             print(f"  {row.planned or '':>8}  {actual:>7}  {row.coverage:>5.0%}  {row.title}"

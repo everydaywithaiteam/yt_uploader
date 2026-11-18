@@ -72,7 +72,28 @@ ln -s "$PWD/skills/ewai-publish-video" ~/.claude/skills/ewai-publish-video
 ## Chapters from the final edit
 
 The chapter times in `upload_metadata_vN.md` come from the plan, but the final edit is
-usually shorter. So the uploader re-times them:
+usually shorter. So the uploader re-times them, using the first source it finds:
+
+1. `--planned-chapters`: the metadata's times as written.
+2. **`chapters.md` beside the export** (written by the `ewai-edit-video` skill). Best source: the
+   edit knows where each section really starts, including screen demos narrated off-script.
+3. Alignment of `production_script_vN.md` against the `.srt` (below).
+
+### chapters.md
+
+```markdown
+| Title | Anchor | Edit time |
+| --- | --- | --- |
+| The finished result | This video is already here in the YouTube Studio | 00:00 |
+| Give the uploader a predictable folder | so as you can see, this is my kind of folder structure | 01:26 |
+```
+
+`Anchor` is the first few words actually spoken where the chapter starts. The uploader finds each
+anchor in the `.srt` (in order, fuzzy, so caption slips still match) and uses that caption's time,
+so later trims don't make the file stale. `Edit time` is only shown for comparison. An anchor
+that can't be found drops that chapter with a warning. Fix the anchor rather than the time.
+
+### Script alignment (fallback)
 
 1. Splits `production_script_vN.md` into its `## Section N – …` blocks and keeps only the spoken
    prose (no headings, edit-map tables or `[CUE]` lines).
