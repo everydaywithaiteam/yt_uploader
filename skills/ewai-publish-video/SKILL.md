@@ -1,6 +1,6 @@
 ---
 name: ewai-publish-video
-description: Publish a finished Everyday With AI long-form video to YouTube. Normalizes the final export's audio to -14 LUFS with yt_audio_norm, then uploads it with title, description, chapters (from the edit's fcp_export/chapters.md, else re-timed from the script against the .srt), tags, thumbnail and captions from the video's yt_production_package_vN. Use when the user wants to publish, post, or upload a video (e.g. "publish video 13", "upload the latest video", "post the new long one to YouTube"). Shorts are not supported yet.
+description: Publish a finished Everyday With AI long-form video to YouTube. Normalizes the final export's audio to -14 LUFS with yt_audio_norm, then uploads it with title, description, chapters (from the edit's fcp_export/chapters.md, else re-timed from the script against the .srt), tags, thumbnail and captions from the video's yt_production_package_vN. Use when the user wants to publish, post, or upload a video (e.g. "publish video 13", "upload the latest video", "post the new long one to YouTube"). Also uploads a batch of YouTube Shorts from a video's yt_shorts/ folder (or a one-off Short), in order, as private, optionally linked to the long-form video (e.g. "upload the shorts for video 13").
 ---
 
 # ewai-publish-video
@@ -19,7 +19,8 @@ Repo docs: `/Users/sam/Claude/yt_uploader/README.md`. Normalizer docs:
   `yt_production_package_vN` and hasn't been uploaded yet.
 - **Visibility (optional):** the default is private. `--publish-at "YYYY-MM-DD HH:MM"` schedules
   it (America/Los_Angeles). `--privacy unlisted|public` is also available.
-- **Shorts:** not implemented. If asked, say so and stop.
+- **Shorts:** a different flow. Read `shorts.md` in this skill's folder and follow it in place
+  of the steps below.
 
 Don't ask for anything the script can find itself.
 
@@ -100,4 +101,5 @@ Don't ask for anything the script can find itself.
   the API audit (https://support.google.com/youtube/contact/yt_api_form). If Studio won't let
   the user make the video public, that's the cause.
 - The API can't pin comments, add end screens or cards, or start a thumbnail Test & Compare.
-- The default quota of 10,000 units a day allows about 4 full uploads.
+- Quota: 100 uploads a day (own bucket), plus 10,000 units a day for everything else
+  (≈500 per long-form video). Resets at midnight Pacific.

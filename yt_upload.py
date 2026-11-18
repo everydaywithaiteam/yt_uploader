@@ -246,6 +246,10 @@ def parse_publish_at(value: str, tz_name: str) -> str:
 
 
 def main():
+    if any(a in ("--shorts", "--short") for a in sys.argv[1:]):
+        import yt_upload_shorts  # separate flow; long-form below is untouched
+        return yt_upload_shorts.main([a for a in sys.argv[1:] if a not in ("--shorts", "--short")])
+
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("folder", nargs="?", help="video folder path, number (12) or name fragment")
     ap.add_argument("--dry-run", action="store_true", help="print the upload plan and stop")
@@ -264,11 +268,9 @@ def main():
                     help="upload the export as-is, without audio normalization")
     ap.add_argument("--normalize-only", action="store_true", help="normalize the audio, then stop")
     ap.add_argument("--check-auth", action="store_true", help="sign in, show the channel, upload nothing")
-    ap.add_argument("--short", action="store_true", help="Shorts mode (not implemented yet)")
+    ap.add_argument("--shorts", action="store_true",
+                    help="upload the folder's yt_shorts/ batch instead (see ./upload --shorts --help)")
     args = ap.parse_args()
-
-    if args.short:
-        sys.exit("Shorts upload is TBD: define the shorts folder/metadata layout first.")
 
     config = load_json(CONFIG_PATH, {})
     if args.check_auth:
