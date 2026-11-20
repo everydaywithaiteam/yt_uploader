@@ -80,6 +80,9 @@ def find_short_videos(shorts_dir: str) -> List[str]:
     files = [f for f in os.listdir(shorts_dir)
              if f.lower().endswith(pk.VIDEO_EXTS) and not f.startswith(".")
              and "-stage1" not in f.lower()]
+    # Gling exports sit next to the raw recording as '<name>-export.mp4'; upload only the export.
+    stems = {os.path.splitext(f)[0].lower() for f in files}
+    files = [f for f in files if os.path.splitext(f)[0].lower() + "-export" not in stems]
     return [os.path.join(shorts_dir, f) for f in sorted(files, key=_natural_key)]
 
 

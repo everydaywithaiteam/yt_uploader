@@ -21,7 +21,8 @@ Other forms:
 
 ```bash
 ./upload 12                                  # pick "video 12 - …"
-./upload 12 --publish-at "2026-11-03 09:00"  # schedule (config timezone)
+./upload 12 --publish-at 2026-11-03           # schedule at default_publish_time (8:45, config timezone)
+./upload 12 --publish-at "2026-11-03 09:00"  # schedule at a given time
 ./upload 12 --privacy unlisted
 ./upload 12 --title 2 --thumbnail 3          # alternate title #2, third thumbnail
 ./upload 12 --no-captions
@@ -149,6 +150,7 @@ Uploads a batch of Shorts from a video's `yt_shorts/` folder, one after another,
 video NN - <slug>/yt_shorts/
   youtube-shorts-package-vN.md     ← highest N wins
   v13 1 - Short_….mp4              ← top-level .mp4/.mov only (originals/ ignored)
+  v13 1 - Short_…-export.mp4       ← a Gling export wins over the raw file beside it
   v13 2 - Short_….mp4
 ```
 
@@ -159,6 +161,8 @@ video NN - <slug>/yt_shorts/
 ./upload 13 --shorts --no-link                  # no long-form link
 ./upload "/path/to/one-off/yt_shorts" --shorts  # a one-off Short outside a video folder
 ./upload 13 --shorts --only 2,5                 # just Shorts 2 and 5
+./upload 13 --shorts --publish-at 2026-11-29    # schedule: one a day at 8:45 from then (private until each goes public)
+./upload 13 --shorts --publish-at "…" --every-days 2  # every other day
 ```
 
 - **Metadata:** each `## Short N` section's `### Title`, `### Description` (or

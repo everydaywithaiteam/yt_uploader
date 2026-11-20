@@ -7,7 +7,7 @@ description: Publish a finished Everyday With AI long-form video to YouTube. Nor
 
 Everything runs through one command in the uploader repo, `/Users/sam/Claude/yt_uploader/upload`.
 In order, it normalizes the audio, uploads the video, then sets the thumbnail, captions and
-playlist. This skill is a thin layer over it: preview, confirm, run, report.
+playlist. This skill is a thin layer over it: preview, fix, run, report, commit.
 
 Repo docs: `/Users/sam/Claude/yt_uploader/README.md`. Normalizer docs:
 `/Users/sam/Claude/audio_normalization/README.md`.
@@ -17,12 +17,15 @@ Repo docs: `/Users/sam/Claude/yt_uploader/README.md`. Normalizer docs:
 - **Which video:** a number (`13`), a folder name fragment, or nothing. With nothing, the script
   picks the newest `video NN - …` folder under `~/Desktop/Everyday With AI/videos` that has a
   `yt_production_package_vN` and hasn't been uploaded yet.
-- **Visibility (optional):** the default is private. `--publish-at "YYYY-MM-DD HH:MM"` schedules
-  it (America/Los_Angeles). `--privacy unlisted|public` is also available.
+- **Visibility (optional):** the default is private. `--publish-at YYYY-MM-DD` schedules it at the
+  config's `default_publish_time`, 8:45 AM America/Los_Angeles, and it stays private until then.
+  Add a time (`"YYYY-MM-DD HH:MM"`) only when the user names one. Don't ask for a time.
+  `--privacy unlisted|public` is also available.
 - **Shorts:** a different flow. Read `shorts.md` in this skill's folder and follow it in place
   of the steps below.
 
-Don't ask for anything the script can find itself.
+Don't ask for anything the script can find itself. Running this skill is the go-ahead to upload:
+don't ask for a confirmation. Stop and ask only for the blockers named in the steps below.
 
 ## Steps
 
@@ -30,7 +33,7 @@ Don't ask for anything the script can find itself.
    ```bash
    cd /Users/sam/Claude/yt_uploader && ./upload <N> --dry-run
    ```
-   Summarize for the user:
+   Check, and later report:
    - the folder and the video file that will be uploaded
    - whether the audio will be normalized first (`Audio:` line)
    - title, privacy, thumbnail, captions and playlist
@@ -40,7 +43,7 @@ Don't ask for anything the script can find itself.
    Exit 1 with "Already uploaded as …" means it's a duplicate. Report the existing link and
    stop. Only use `--force` if the user explicitly wants a second copy.
 
-2. **Fix what the preview flags, with the user's OK.** Problems with the copy itself are edits
+2. **Fix what the preview flags.** Problems with the copy itself are edits
    to `upload_metadata_vN.md` in the highest package version. Examples: author notes left in
    the description, `[confirm …]` placeholders, titles over 100 characters. Propose the exact
    edit, make it after the user agrees, then re-run the dry run.
@@ -53,24 +56,24 @@ Don't ask for anything the script can find itself.
    - **Source is `chapters.md`:** a dropped chapter or a match under 85% means its anchor isn't
      in the captions as written. Find the line in the `.srt`, copy its first 6–10 words into the
      `Anchor` cell, re-run the dry run.
-   - **Source is the script** and any chapter is dropped or under 70%: offer to write
-     `chapters.md`. Read the `.srt` next to the script. For each section, find the first caption
+   - **Source is the script** and any chapter is dropped or under 70%: write `chapters.md`
+     yourself, without asking. Read the `.srt` next to the script. For each section, find the first caption
      where that section's content begins. When a screen demo opens the section, that's the
      first words of the ad-libbed walkthrough, not the later scripted sentence. Use the titles
-     from the metadata's `## Chapters`, in order. Show the table, write it after the user agrees,
-     re-run the dry run. YouTube needs at least 3 chapters, the first at 0:00, each 10s or more.
+     from the metadata's `## Chapters`, in order. Write it, re-run the dry run, and
+     show the table in the report. YouTube needs at least 3 chapters, the first at 0:00, each 10s or more.
    - Use `--planned-chapters` only if the user asks for the planned times.
 
    **Captions.** The uploader sends the newest `.srt` beside the video. If it still looks like a
-   raw Tella transcript ("Cloud" for Claude, "SKALE", leading spaces, doubled words), offer to
-   clean it with the caption rules in `ewai-edit-video` before uploading. Keep any backup copy
+   raw Tella transcript ("Cloud" for Claude, "SKALE", leading spaces, doubled words), clean it
+   with the caption rules in `ewai-edit-video` before uploading, without asking. Keep any backup copy
    out of `fcp_export/` or give it a non-`.srt` extension, or it may be uploaded instead.
 
-3. **Confirm, then upload.** Uploading is outward-facing, so get a clear yes on the summary
-   first. Then run it in the background: normalizing takes about 1.5 minutes per 10 minutes of
+3. **Upload without asking.** If nothing blocks it (an `ERROR`, a copy edit waiting on the user's
+   OK, a duplicate), run it in the background: normalizing takes about 1.5 minutes per 10 minutes of
    video, plus upload time.
    ```bash
-   cd /Users/sam/Claude/yt_uploader && ./upload <N> --yes [--publish-at "…"] 2>&1 | tr '\r' '\n' | grep -v '^  video: [0-9]*%$'
+   cd /Users/sam/Claude/yt_uploader && ./upload <N> --yes [--publish-at YYYY-MM-DD] 2>&1 | tr '\r' '\n' | grep -v '^  video: [0-9]*%$'
    ```
    - If the normalizer writes a `⚠️ CHECK THIS — <name>.txt` file, the script stops before
      uploading and prints that file. Relay it. Re-run with `--skip-normalize` only if the user
@@ -83,6 +86,13 @@ Don't ask for anything the script can find itself.
    exactly as the script printed it. That list covers the pinned comment text, end screen and
    cards, the playlist if none was set, and a thumbnail Test & Compare. Also remind the user to
    review the auto-uploaded captions for product-name typos before publishing.
+
+## Commit what changed
+
+If running the skill changed anything in `/Users/sam/Claude/yt_uploader` (code, `config.json`,
+these skill docs), commit it at the end without asking. Use a `claude/…` branch if `main` is
+checked out, and end the message with the attribution line. Push, open a PR or merge only when the
+user asks. `state/` and `credentials/` are gitignored and never go in.
 
 ## Other commands
 
