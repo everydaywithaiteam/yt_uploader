@@ -153,6 +153,10 @@ def main(argv: Optional[List[str]] = None):
     ap.add_argument("--privacy", choices=["private", "unlisted", "public"], help="default: private")
     ap.add_argument("--playlist", metavar="NAME", help="add to this playlist instead of the config default")
     ap.add_argument("--no-playlist", action="store_true", help="don't add to any playlist")
+    ap.add_argument("--publish-at", metavar="'YYYY-MM-DD HH:MM'",
+                    help="schedule the first Short (config timezone); later ones follow --every-days apart")
+    ap.add_argument("--every-days", type=int, default=1, metavar="N",
+                    help="days between scheduled Shorts (default 1)")
     ap.add_argument("--yes", "-y", action="store_true", help="skip the confirmation prompts")
     ap.add_argument("--force", action="store_true", help="upload despite errors or previous uploads")
     args = ap.parse_args(argv)
@@ -206,6 +210,22 @@ def main(argv: Optional[List[str]] = None):
                 link_source = "entered"
 
     privacy = args.privacy or config.get("default_privacy", "private")
+    schedule = {}  # short number -> (local label, UTC RFC3339)
+    if args.publish_at:
+        from zoneinfo import ZoneInfo
+        if privacy != "private":
+            sys.exit("--publish-at needs private uploads (YouTube flips them public at the scheduled time).")
+        if args.every_days < 1:
+            sys.exit("--every-days must be 1 or more.")
+        tz = ZoneInfo(config.get("timezone", "UTC"))
+        start = dt.datetime.strptime(args.publish_at, "%Y-%m-%d %H:%M").replace(tzinfo=tz)
+        if start <= dt.datetime.now(tz):
+            sys.exit(f"--publish-at {args.publish_at} is in the past.")
+        for k, it in enumerate(items):
+            # Add calendar days in local time so DST changes keep the same wall-clock time.
+            when = (start.replace(tzinfo=None) + dt.timedelta(days=k * args.every_days)).replace(tzinfo=tz)
+            schedule[it.meta.number] = (when.strftime("%a %Y-%m-%d %H:%M"),
+                                        when.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     playlist_name = None if args.no_playlist else (
         args.playlist or config.get("shorts_playlist", config.get("default_playlist")))
     lang = config.get("language", "en")
@@ -214,7 +234,8 @@ def main(argv: Optional[List[str]] = None):
     print(f"\nFolder:      {os.path.relpath(shorts_dir, root) if shorts_dir.startswith(root) else shorts_dir}")
     print(f"Package:     {os.path.basename(package_path)}  ({len(metas)} shorts)")
     print(f"Long-form:   {long_url + '  (from ' + link_source + ')' if long_url else '— none'}")
-    print(f"Privacy:     {privacy}")
+    print(f"Privacy:     {privacy}" + (f", scheduled every {args.every_days} day(s) from {args.publish_at} "
+                                         f"({config.get('timezone')})" if schedule else ""))
     print(f"Playlist:    {playlist_name or '— none'}")
     print("Audio:       uploaded as-is (no normalization)")
 
@@ -230,6 +251,8 @@ def main(argv: Optional[List[str]] = None):
         shape = f"{dims[0]}x{dims[1]}" if dims else "?"
         print(f"\n[{idx}/{len(items)}] Short {item.meta.number}: {item.meta.title}")
         print(f"  File:  {os.path.basename(path)}  {size}  {fmt_secs(duration) if duration else '?'}  {shape}")
+        if item.meta.number in schedule:
+            print(f"  Publishes: {schedule[item.meta.number][0]}")
         print(f"  Tags ({len(item.meta.tags)}): {', '.join(item.meta.tags)}")
         print("  Description:\n" + "\n".join("    " + l for l in description.splitlines()))
         if prev:
@@ -275,6 +298,8 @@ def main(argv: Optional[List[str]] = None):
             "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False, "embeddable": True,
                        "containsSyntheticMedia": config.get("contains_synthetic_media", False)},
         }
+        if m.number in schedule:
+            body["status"]["publishAt"] = schedule[m.number][1]
         print(f"\n[{idx}/{len(todo_items)}] Uploading Short {m.number}: {m.title}")
         try:
             video_id = yt_api.upload_video(yt, item.video_path, body, config.get("notify_subscribers", True))
@@ -283,7 +308,7 @@ def main(argv: Optional[List[str]] = None):
             break
         print(f"  Uploaded: https://youtu.be/{video_id}")
         record = {"video_id": video_id, "title": m.title, "short_number": m.number, "privacy": privacy,
-                  "long_form_url": long_url, "package": package_path,
+                  "publish_at": schedule.get(m.number, (None, None))[1], "long_form_url": long_url, "package": package_path,
                   "uploaded_at": dt.datetime.now().isoformat(timespec="seconds")}
         state[item.video_path] = record
         save_shorts_state(state)  # save after each so a re-run continues where it stopped
@@ -302,7 +327,8 @@ def main(argv: Optional[List[str]] = None):
     print("\n==== Shorts uploaded ====")
     for m, video_id, _ in done:
         print(f"  Short {m.number}: https://youtu.be/{video_id}   "
-              f"Studio: https://studio.youtube.com/video/{video_id}/edit   {m.title}")
+              f"Studio: https://studio.youtube.com/video/{video_id}/edit   {m.title}"
+              + (f"   publishes {schedule[m.number][0]}" if m.number in schedule else ""))
     if stopped:
         num, e = stopped
         why = "YouTube API quota / upload limit reached" if quota_error(e) else f"error: {e}"
@@ -319,7 +345,7 @@ def main(argv: Optional[List[str]] = None):
     for m, _, todo in done:
         for t in todo:
             print(f"  - Short {m.number}: {t}")
-    if privacy == "private" and done:
+    if privacy == "private" and done and not schedule:
         print("  - Shorts are private: set visibility / schedule each in Studio when ready")
     if stopped:
         sys.exit(1)

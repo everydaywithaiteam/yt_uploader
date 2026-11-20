@@ -159,6 +159,8 @@ video NN - <slug>/yt_shorts/
 ./upload 13 --shorts --no-link                  # no long-form link
 ./upload "/path/to/one-off/yt_shorts" --shorts  # a one-off Short outside a video folder
 ./upload 13 --shorts --only 2,5                 # just Shorts 2 and 5
+./upload 13 --shorts --publish-at "2026-11-29 09:00"   # schedule: one a day from then (private until each goes public)
+./upload 13 --shorts --publish-at "…" --every-days 2  # every other day
 ```
 
 - **Metadata:** each `## Short N` section's `### Title`, `### Description` (or

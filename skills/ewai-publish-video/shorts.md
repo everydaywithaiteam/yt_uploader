@@ -32,6 +32,9 @@ folder itself, or its parent that holds `yt_shorts/`).
   user to confirm it, paste a different link, or say none (one-off Shorts usually have none).
   Pass the answer as `--long-url <URL or ID>` or `--no-link`.
 - **Subset (optional):** `--only 2,5` uploads just those short numbers.
+- **Schedule (optional):** `--publish-at "YYYY-MM-DD HH:MM"` (config timezone) schedules the first
+  Short; each later Short in the batch publishes `--every-days N` after the previous one (default 1).
+  Uploads stay private until their time. If the user gives a start date but no time, ask for one.
 
 ## Steps
 
@@ -72,4 +75,5 @@ folder itself, or its parent that holds `yt_shorts/`).
 | --- | --- |
 | Different playlist / none | `--playlist "Name"` / `--no-playlist` |
 | Unlisted instead of private | `--privacy unlisted` |
+| One a day from a date | `--publish-at "2026-11-29 09:00"` (`--every-days N` to space them out) |
 | Upload a Short again | `--force --only N` (only if the user asks for a second copy) |
