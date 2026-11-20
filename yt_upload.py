@@ -237,14 +237,6 @@ def prepare_thumbnail(path: str) -> str:
     return out
 
 
-def parse_publish_at(value: str, tz_name: str) -> str:
-    from zoneinfo import ZoneInfo
-    local = dt.datetime.strptime(value, "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo(tz_name))
-    if local <= dt.datetime.now(local.tzinfo):
-        sys.exit(f"--publish-at {value} is in the past.")
-    return local.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def main():
     if any(a in ("--shorts", "--short") for a in sys.argv[1:]):
         import yt_upload_shorts  # separate flow; long-form below is untouched
@@ -254,7 +246,7 @@ def main():
     ap.add_argument("folder", nargs="?", help="video folder path, number (12) or name fragment")
     ap.add_argument("--dry-run", action="store_true", help="print the upload plan and stop")
     ap.add_argument("--privacy", choices=["private", "unlisted", "public"], help="override config default")
-    ap.add_argument("--publish-at", metavar="'YYYY-MM-DD HH:MM'",
+    ap.add_argument("--publish-at", metavar="'YYYY-MM-DD[ HH:MM]'",
                     help="schedule publish (local time from config timezone); uploads as private until then")
     ap.add_argument("--title", type=int, default=0, metavar="N", help="use alternate title N (1-based)")
     ap.add_argument("--thumbnail", type=int, default=1, metavar="N", help="use Nth thumbnail (default 1)")
@@ -307,7 +299,10 @@ def main():
     warnings = chapter_warnings + warnings
 
     privacy = args.privacy or config.get("default_privacy", "private")
-    publish_at = parse_publish_at(args.publish_at, config.get("timezone", "UTC")) if args.publish_at else None
+    from ytu import schedule as sched
+    publish_local = sched.parse_local(args.publish_at, config.get("timezone", "UTC"),
+                                      config.get("default_publish_time", sched.DEFAULT_TIME)) if args.publish_at else None
+    publish_at = sched.to_utc(publish_local) if publish_local else None
     if publish_at:
         privacy = "private"
     # --playlist > per-folder override > config default > metadata's "Playlist" setting.
@@ -334,7 +329,7 @@ def main():
     print(f"Thumbnail:   {rel(thumbnail)}")
     print(f"Captions:    {rel(pkg.captions_path) if use_captions else 'skipped'}")
     print(f"Title:       {meta.title}")
-    print(f"Privacy:     {privacy}" + (f", publishes {args.publish_at} ({config.get('timezone')})" if publish_at else ""))
+    print(f"Privacy:     {privacy}" + (f", publishes {sched.label(publish_local)} ({config.get('timezone')})" if publish_at else ""))
     print(f"Category:    {meta.category_id or '28'}   Kids: {bool(meta.made_for_kids)}   Language: {meta.language or 'en'}")
     print(f"Playlist:    {playlist_name or '— (none set)'}")
     print(f"Tags ({len(meta.tags)}):   {', '.join(meta.tags)}")

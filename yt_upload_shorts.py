@@ -153,8 +153,9 @@ def main(argv: Optional[List[str]] = None):
     ap.add_argument("--privacy", choices=["private", "unlisted", "public"], help="default: private")
     ap.add_argument("--playlist", metavar="NAME", help="add to this playlist instead of the config default")
     ap.add_argument("--no-playlist", action="store_true", help="don't add to any playlist")
-    ap.add_argument("--publish-at", metavar="'YYYY-MM-DD HH:MM'",
-                    help="schedule the first Short (config timezone); later ones follow --every-days apart")
+    ap.add_argument("--publish-at", metavar="'YYYY-MM-DD[ HH:MM]'",
+                    help="schedule the first Short (config timezone; date only = default_publish_time); "
+                         "later ones follow --every-days apart")
     ap.add_argument("--every-days", type=int, default=1, metavar="N",
                     help="days between scheduled Shorts (default 1)")
     ap.add_argument("--yes", "-y", action="store_true", help="skip the confirmation prompts")
@@ -212,20 +213,16 @@ def main(argv: Optional[List[str]] = None):
     privacy = args.privacy or config.get("default_privacy", "private")
     schedule = {}  # short number -> (local label, UTC RFC3339)
     if args.publish_at:
-        from zoneinfo import ZoneInfo
+        from ytu import schedule as sched
         if privacy != "private":
             sys.exit("--publish-at needs private uploads (YouTube flips them public at the scheduled time).")
         if args.every_days < 1:
             sys.exit("--every-days must be 1 or more.")
-        tz = ZoneInfo(config.get("timezone", "UTC"))
-        start = dt.datetime.strptime(args.publish_at, "%Y-%m-%d %H:%M").replace(tzinfo=tz)
-        if start <= dt.datetime.now(tz):
-            sys.exit(f"--publish-at {args.publish_at} is in the past.")
+        start = sched.parse_local(args.publish_at, config.get("timezone", "UTC"),
+                                  config.get("default_publish_time", sched.DEFAULT_TIME))
         for k, it in enumerate(items):
-            # Add calendar days in local time so DST changes keep the same wall-clock time.
-            when = (start.replace(tzinfo=None) + dt.timedelta(days=k * args.every_days)).replace(tzinfo=tz)
-            schedule[it.meta.number] = (when.strftime("%a %Y-%m-%d %H:%M"),
-                                        when.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+            when = sched.add_days(start, k * args.every_days)
+            schedule[it.meta.number] = (sched.label(when), sched.to_utc(when))
     playlist_name = None if args.no_playlist else (
         args.playlist or config.get("shorts_playlist", config.get("default_playlist")))
     lang = config.get("language", "en")
@@ -234,7 +231,7 @@ def main(argv: Optional[List[str]] = None):
     print(f"\nFolder:      {os.path.relpath(shorts_dir, root) if shorts_dir.startswith(root) else shorts_dir}")
     print(f"Package:     {os.path.basename(package_path)}  ({len(metas)} shorts)")
     print(f"Long-form:   {long_url + '  (from ' + link_source + ')' if long_url else '— none'}")
-    print(f"Privacy:     {privacy}" + (f", scheduled every {args.every_days} day(s) from {args.publish_at} "
+    print(f"Privacy:     {privacy}" + (f", scheduled every {args.every_days} day(s) from {sched.label(start)} "
                                          f"({config.get('timezone')})" if schedule else ""))
     print(f"Playlist:    {playlist_name or '— none'}")
     print("Audio:       uploaded as-is (no normalization)")
